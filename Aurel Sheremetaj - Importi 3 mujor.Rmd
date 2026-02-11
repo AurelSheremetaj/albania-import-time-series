@@ -1,0 +1,637 @@
+---
+title: "Indeksi 3 mujor i cmimeve te importit"
+author: "Aurel Sheremetaj"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output:
+  html_document:
+    theme: united
+    toc: true
+    toc_float: true
+    df_print: paged
+    self_contained: true
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE
+)
+
+```
+
+
+
+# Hyrje 
+
+
+Në këtë projekt analizohet importi 3-mujor, duke u fokusuar në ndërtimin dhe vlerësimin e modeleve statistikore për përshkrimin dhe parashikimin e tij. Fillimisht realizohet eksplorimi grafik i të dhënave dhe analiza e komponentëve kryesorë të serisë, si trendi dhe sezonaliteti. Më pas ndërtohen dhe krahasohen disa modele të serive kohore, përfshirë modelet MA, AR dhe ARIMA, me qëllim zgjedhjen e modelit më të përshtatshëm për parashikim.
+
+---
+
+
+# Dataseti
+
+```{r}
+library(readxl)
+library(ggplot2)
+library(forecast)
+library(dplyr)
+library(tidyr)
+library(knitr)
+library(dygraphs)
+```
+
+
+
+```{r}
+library(readxl)
+library(knitr)
+
+#Importi_3_mujor <- read_excel("~/cmimi i importit 3 mujor.xlsx")
+Importi_3_mujor <- readxl::read_excel("cmimi i importit 3 mujor.xlsx")
+
+
+
+head(Importi_3_mujor)
+
+```
+
+
+```{r}
+str(Importi_3_mujor)
+head(Importi_3_mujor)
+```
+
+
+```{r}
+ts_importi <- ts(Importi_3_mujor$Totali,
+                 start = c(2012, 1),
+                 frequency = 4)
+ts_importi
+
+
+```
+## Paraqitja grafike/trendi/sezonaliteti
+
+
+```{r}
+plot(ts_importi,
+     type = "o",                 
+     col = "darkred",          
+     pch = 16,
+     lwd = 2,
+     main = " Indeksi 3-mujor i Çmimeve të Importit",
+     ylab = " Indeksi i Çmimeve të Importit",
+     xlab = "Koha (Vitet dhe Tremujorët)")
+grid(col = "wheat4")
+```
+
+
+```{r}
+#sezonaliteti trendi 
+decomp <- decompose(ts_importi) 
+plot(decomp)
+```
+Nga grafiku i mësipërm mund të shohim se seria jonë ka sezonalitet të fortë dhe ka gjithashtu dhe trend por trendi nuk është konstant vihet re se ka patur një trend zbritës deri në vitin 2019  dhe pastaj ka filluar të ketë një trend rritës
+
+
+```{r}
+ggsubseriesplot(ts_importi)
+```
+
+
+```{r}
+library(forecast)
+library(ggplot2)
+
+ggsubseriesplot(ts_importi) +
+
+  # linja brenda çdo tremujori
+  geom_line(aes(group = 1),
+            color = "steelblue4",
+            linewidth = 0.7) +
+
+  # mesatarja e përgjithshme
+  geom_hline(yintercept = mean(ts_importi),
+             color = "maroon3",
+             linetype = "dashed",
+             linewidth = 1) +
+
+  theme_minimal(base_size = 15) +
+  labs(
+    title = "Subseries Plot për Indeksin e Çmimeve të Importit (3-mujor)",
+    subtitle = "Krahasimi i sjelljes së indeksit brenda secilit tremujor",
+    x = "Tremujori",
+    y = "Indeksi i Çmimeve të Importit"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 20),
+    plot.subtitle = element_text(size = 14),
+    strip.text = element_text(size = 14, face = "bold", color = "steelblue4"),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 14),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank()
+  )
+
+```
+Nga grafiket shohim qarte se indeksi i çmimeve të importit shfaq një sezonalitet të theksuar tremujor.Vijat blu  janë relativisht afër njëra-tjetrës, çka tregon  një model sezonal të qëndrueshëm ndersa vija e nderprere sugjeron se niveli mesatar i indeksit mbetet relativisht stabil në kohë, pa një trend të fortë afatgjatë.
+
+
+
+```{r}
+dygraph(ts_importi,
+        main = "Indeksi i Çmimeve të Importit") %>%
+  dySeries("V1",
+           label = "Importi",
+           color = "darkblue",
+           fillGraph = TRUE,
+           strokeWidth = 2) %>%
+  dyRangeSelector(height = 25)
+```
+
+
+
+```{r}
+library(tseries)
+adf.test(ts_importi)
+```
+Mund të shihet përderisa p-value= 0.6231 seria jonë nuk është stacionare
+
+---
+
+# Procesi MA AR
+
+Më poshtë shohim disa grafike për MA(1) AR(1) për theta të ndryshme dhe shikojmë ACF PACF
+
+
+## MA(1)
+
+```{r}
+library(forecast)
+
+set.seed(42)
+n <- 100
+
+# Simulime MA(1)
+ts_ma_pos <- arima.sim(model = list(ma = 0.8), n = n)
+ts_ma_neg <- arima.sim(model = list(ma = -0.8), n = n)
+
+par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
+
+# MA(1) me theta = 0.8
+plot(ts_ma_pos,
+     type = "l",
+     col = "steelblue4",
+     lwd = 2,
+     main = expression(paste("Procesi MA(1) me ", theta[1], " = 0.8")),
+     xlab = "Koha",
+     ylab = expression(X[t]))
+grid(col = "gray80")
+box(lwd = 1.2)
+
+# MA(1) me theta = -0.8
+plot(ts_ma_neg,
+     type = "l",
+     col = "firebrick3",
+     lwd = 2,
+     main = expression(paste("Procesi MA(1) me ", theta[1], " = -0.8")),
+     xlab = "Koha",
+     ylab = expression(X[t]))
+grid(col = "gray80")
+box(lwd = 1.2)
+
+
+
+```
+
+
+```{r}
+library(forecast)
+
+set.seed(42)
+n <- 100
+
+# MA(1) me theta = 1
+ts_ma1_theta1 <- arima.sim(model = list(ma = 1), n = n)
+
+# Grafik i procesit
+plot(ts_ma1_theta1,
+     type = "l",
+     col = "darkorange2",
+     lwd = 2,
+     main = expression(paste("Procesi MA(1) me ", theta[1], " = 1")),
+     xlab = "Koha",
+     ylab = expression(X[t]))
+
+grid(col = "gray80")
+box(lwd = 1.5)
+
+```
+
+
+
+```{r}
+set.seed(42)
+ts_ma1_neg05 <- arima.sim(model = list(ma = -0.8), n = 100)
+
+# ACF dhe PACF për procesin MA(1)
+par(mfrow = c(1, 2))
+
+acf(ts_ma1_neg05,
+    main = expression(paste("ACF për MA(1) me ", theta[1], " = -0.8")),
+    col = "mediumaquamarine",         
+    lwd = 2)
+
+pacf(ts_ma1_neg05,
+     main = expression(paste("PACF për MA(1) me ", theta[1], " = -0.8")),
+     col = "hotpink2",       
+     lwd = 2)
+```
+
+
+```{r}
+set.seed(42)
+ts_ma1_neg05 <- arima.sim(model = list(ma = 0.8), n = 100)
+
+# ACF dhe PACF për procesin MA(1)
+par(mfrow = c(1, 2))
+
+acf(ts_ma1_neg05,
+    main = expression(paste("ACF për MA(1) me ", theta[1], " = 0.8")),
+    col = "magenta3",         
+    lwd = 2)
+
+pacf(ts_ma1_neg05,
+     main = expression(paste("PACF për MA(1) me ", theta[1], " = 0.8")),
+     col = "darkolivegreen3",       
+     lwd = 2)
+```
+
+
+```{r}
+set.seed(42)
+ts_ma1_neg05 <- arima.sim(model = list(ma = 1 ), n = 100)
+
+# ACF dhe PACF për procesin MA(1)
+par(mfrow = c(1, 2))
+
+acf(ts_ma1_neg05,
+    main = expression(paste("ACF për MA(1) me ", theta[1], " = 1 ")),
+    col = "coral",         
+    lwd = 2)
+
+pacf(ts_ma1_neg05,
+     main = expression(paste("PACF për MA(1) me ", theta[1], " = 1")),
+     col = "thistle3",       
+     lwd = 2)
+```
+
+
+## AR(1)
+
+```{r}
+set.seed(42)
+n_sim <- 100
+
+ts_ar1_pos04 <- arima.sim(model = list(ar = 0.4), n = n_sim)
+
+plot(ts_ar1_pos04,
+     type = "l",
+     col = "darkblue",   
+     lwd = 2,            
+     main = expression(paste("Simulimi i procesit AR(1) me ", phi[1], " = 0.4")),
+     ylab = "X(t)",
+     xlab = "Koha")
+
+grid(col = "lightgray") 
+```
+```{r}
+par(mfrow = c(1, 2))
+
+acf(ts_ar1_pos04,
+    main = expression(paste("ACF për AR(1) me ", phi[1], " = 0.4")),
+    col = "skyblue",  
+    lwd = 2)
+
+pacf(ts_ar1_pos04,
+     main = expression(paste("PACF për AR(1) me ", phi[1], " = 0.4")),
+     col = "purple",    
+     lwd = 2)
+```
+
+
+## ARMA
+
+
+```{r}
+# Koeficientët arbitrarë: phi1=0.45, theta1=0.78
+ts_arma11 <- arima.sim(model = list(ar = c(0.45), ma = c(0.58)), n = n)
+
+par(mfrow = c(1, 2))
+acf(ts_arma11,
+    col="black",
+    lwd=2,
+    main = "ACF per ARMA(1, 1)")
+pacf(ts_arma11,
+     main = "PACF per ARMA(1, 1)",
+     col="gray",lwd=2)
+```
+
+---
+
+# Studimi i AR MM ARMA
+
+## Ma(3)
+
+
+```{r}
+h_test <- 8
+
+ts_train <- window(
+  ts_importi,
+  end = time(ts_importi)[length(ts_importi) - h_test]
+)
+
+ts_test <- window(
+  ts_importi,
+  start = time(ts_importi)[length(ts_importi) - h_test + 1]
+)
+```
+
+
+
+
+```{r}
+q_order <- 3
+
+# Modelimi MA(3) mbi të dhënat e trajnimit (ts_train)
+model_ma <- arima(ts_train, order = c(0, 0, q_order))
+
+# Afishimi i Modelit MA(2)
+cat("### Përmbledhja e Modelit MA(3) ###\n")
+
+print(summary(model_ma))
+
+```
+Në këtë studim kemi marrë MA(3),shohim se  nga modeli MA(3) luhatjet e serisë ndikohen kryesisht nga goditjet e periudhës së fundit, ndërsa efekti i goditjeve më të hershme është i dobët dhe zbehet shpejt.
+
+
+```{r}
+library(forecast)
+
+q_order <- 3
+
+# Përshtatja e modelit MA(q)
+model_ma <- Arima(ts_train, order = c(0, 0, q_order))
+
+# Parashikimi
+forecast_ma <- forecast(model_ma, h = h_test)
+
+# Grafik
+plot(forecast_ma,
+     main = paste0("Modeli MA(", q_order, "): Përshtatja dhe Parashikimi"),
+     xlab = "Koha",
+     ylab = "Vlera e Serisë",
+     xlim = range(time(ts_importi)))
+
+# Seria e trajnimit 
+lines(ts_train,
+      col = "orangered3",
+      lwd = 1.5)
+
+#  Seria e përshtatur 
+lines(fitted(model_ma),
+      col = "mediumseagreen",
+      lwd = 2)
+
+#  Seria e testimit (reale)
+lines(ts_test,
+      col = "slateblue4",
+      lty = 2,
+      lwd = 2)
+
+legend("topleft",
+       legend = c("Seria e trajnimit (reale)",
+                  paste0("Seria e përshtatur (MA(", q_order, "))"),
+                  paste0("Parashikimi (MA(", q_order, "))"),
+                  "Seria e testimit (reale)"),
+       col = c("orangered3", "mediumseagreen", "mediumseagreen", "slateblue4"),
+       lty = c(1, 1, 2, 2),
+       lwd = c(1.5, 2, 2, 2),
+       cex = 0.85)
+
+
+```
+Grafiku tregon se modeli MA(3) arrin të ndjekë relativisht mirë luhatjet afatshkurtra të serisë së trajnimit megjithatë, gjatë periudhës së testimit vërehet se parashikimi i MA(3) tenton të sheshohet rreth një niveli mesatar, duke mos kapur plotësisht amplitudën e luhatjeve reale.
+
+
+## AR(3)
+
+
+```{r}
+p_order <- 3
+
+# Modelimi AR(3) mbi të dhënat e trajnimit (ts_train)
+model_ar <- arima(ts_train, order = c(p_order, 0, 0))
+
+# Afishimi i Modelit AR(2)
+cat("### Përmbledhja e Modelit AR(3) ###\n")
+
+print(summary(model_ar))
+```
+Modeli AR(3) kap mirë varësinë afatshkurtër të serisë, me ndikim dominues të vlerës së kaluar një periudhë më parë. Megjithatë, nivelet relativisht të larta të gabimit tregojnë se modeli nuk përshkruan plotësisht luhatjet e serisë.
+
+
+```{r}
+forecast_ar <- forecast(model_ar, h = h_test)
+
+p_order <- 3
+
+plot(forecast_ar,
+     main = paste("Modeli AR(", p_order, "): Përshtatja dhe Parashikimi për  cmimin e importit "),
+     xlab = "Koha",
+     ylab = "Numri i Lindjeve",
+     xlim = range(time(ts_importi)))
+
+
+lines(fitted(model_ar), col = "plum4")
+
+
+lines(ts_test, col = "sienna", lty = 2)
+
+legend("topleft",
+       legend = c("Seria e trajnimit (reale)",
+                  "Seria e përshtatur (AR)",
+                  "Parashikimi (AR)",
+                  "Seria e testimit (reale)"),
+       col = c("turquoise4", "plum4", "plum4", "sienna"),
+       lty = c(1, 1, 2, 2),
+       cex = 0.8)
+
+```
+Gjatë trajnimit, modeli përshtatet në mënyrë të qëndrueshme me strukturën e serisë dhe kap varësinë kohore ndërmjet vëzhgimeve. Në fazën e testimit, modeli jep parashikime të pranueshme, megjithëse pasiguria rritet në periudhat me luhatje më të forta
+
+
+## Vleresimi i modelit Arma
+
+```{r}
+model_arma_auto <- auto.arima(ts_importi, 
+                           stepwise = FALSE, # Provon më shumë kombinime
+                           approximation = FALSE, # Përdor vlerësimin e saktë
+                           ic = "aicc") 
+
+# Afishimi i modelit të zgjedhur automatikisht
+cat("### Modeli ARIMA/ARMA/SARIMA më i Përshtatshëm i zgjedhur nga auto.arima ###\n")
+
+print(model_arma_auto)
+
+
+```
+auto.arima zgjodhi modelin ARIMA(0,1,1)(0,0,1)[4], që tregon se seria ka nevojë për diferencim dhe paraqet sezonalitet tremujor.
+
+## Grafikët e Përshtatjes dhe Parashikimit
+
+
+```{r}
+forecast_arma_auto <- forecast(model_arma_auto, h = h_test)
+
+# Grafik i serisë së përshtatur dhe parashikimit
+plot(forecast_arma_auto,
+     main = paste("Modeli i Zgjedhur ARIMA(",
+                  model_arma_auto$arma[1], ",",
+                  model_arma_auto$arma[6], ",",
+                  model_arma_auto$arma[2], ") - Përshtatja dhe Parashikimi për Lindjet"),
+     xlab = "Koha",
+     ylab = "Numri i Lindjeve",
+     xlim = range(time(ts_importi)))
+
+# Vlerat e përshtatura (training)
+lines(fitted(model_arma_auto), col = "blue")
+
+# Vlerat reale të testimit
+lines(ts_test, col = "red", lty = 2)
+
+legend("topleft",
+       legend = c("Seria e Trajnimit (Reale)",
+                  "Seria e Përshtatur (ARIMA)",
+                  "Parashikimi (ARIMA)",
+                  "Seria e Testimit (Reale)"),
+       col = c("black", "blue", "blue", "red"),
+       lty = c(1, 1, 2, 2),
+       cex = 0.8)
+      
+
+```
+Modeli ARIMA(0,1,1) paraqet një përshtatje të qëndrueshme gjatë trajnimit dhe prodhon parashikime të stabilizuara në periudhën e testimit. Kjo sugjeron se modeli është i përshtatshëm për analizë dhe parashikim afatshkurtër.
+
+
+```{r}
+# Afishimi i parashikimit krahasuar me vlerat reale
+print(head(data.frame(
+  Data = time(ts_test),
+  Parashikimi_ARMA = as.numeric(forecast_arma_auto$mean),
+  Vlera_Reale = as.numeric(ts_test)
+), 10))
+```
+## Vleresimi i gabimit
+
+
+```{r}
+
+library(dplyr)
+library(forecast)
+library(knitr)
+library(kableExtra)
+
+# Funksioni për llogaritjen e gabimeve
+calculate_errors <- function(actual, predicted) {
+  errors <- actual - predicted
+  rmse <- sqrt(mean(errors^2, na.rm = TRUE))
+  mae  <- mean(abs(errors), na.rm = TRUE)
+  mape <- mean(abs(errors / actual), na.rm = TRUE) * 100
+  
+  data.frame(
+    RMSE = rmse,
+    MAE  = mae,
+    MAPE = mape
+  )
+}
+
+
+# Gabimet e Trajnimit
+errors_train_ma   <- calculate_errors(ts_train, fitted(model_ma))
+errors_train_ar   <- calculate_errors(ts_train, fitted(model_ar))
+errors_train_arma <- calculate_errors(ts_train, fitted(model_arma_auto))
+
+
+# Gabimet e Testimit
+errors_test_ma   <- calculate_errors(ts_test, as.numeric(forecast_ma$mean))
+errors_test_ar   <- calculate_errors(ts_test, as.numeric(forecast_ar$mean))
+errors_test_arma <- calculate_errors(ts_test, as.numeric(forecast_arma_auto$mean))
+
+
+# Krijimi i tabelës përfundimtare
+results_table <- bind_rows(
+  
+  mutate(errors_train_ma,
+         Model = "MA(3)",
+         Seksioni = "Trajnim"),
+  
+  mutate(errors_test_ma,
+         Model = "MA(3)",
+         Seksioni = "Testim"),
+  
+  mutate(errors_train_ar,
+         Model = paste0("AR(", model_ar$arma[1], ")"),
+         Seksioni = "Trajnim"),
+  
+  mutate(errors_test_ar,
+         Model = paste0("AR(", model_ar$arma[1], ")"),
+         Seksioni = "Testim"),
+  
+  mutate(errors_train_arma,
+         Model = paste0("ARIMA(",
+                        model_arma_auto$arma[1], ", ",
+                        model_arma_auto$arma[6], ", ",
+                        model_arma_auto$arma[2], ")"),
+         Seksioni = "Trajnim"),
+  
+  mutate(errors_test_arma,
+         Model = paste0("ARIMA(",
+                        model_arma_auto$arma[1], ", ",
+                        model_arma_auto$arma[6], ", ",
+                        model_arma_auto$arma[2], ")"),
+         Seksioni = "Testim")
+  
+) %>%
+  select(Seksioni, Model, RMSE, MAE, MAPE)
+
+
+# SHFAQJA E TABELËS 
+results_table %>%
+  knitr::kable(
+    caption = "Krahasimi i Metrikave të Gabimit (RMSE, MAE, MAPE)",
+    col.names = c("Seksioni", "Modeli", "RMSE", "MAE", "MAPE"),
+    digits = c(0, 0, 2, 2, 2),
+    booktabs = TRUE,
+    align = c("l", "l", "r", "r", "r")
+  ) %>%
+  kable_styling(
+    full_width = FALSE,
+    position = "center"
+  )
+```
+
+Nga krahasimi i metrikave të gabimit, MA(3) dhe AR(3) japin rezultate më të mira si në trajnim ashtu edhe në testim. Modeli ARIMA(0,1,1) paraqet gabime dukshëm më të larta, duke treguar përshtatje më të dobët për këtë seri.
+
+---
+
+
+# Perfundime
+
+
+Nga analiza e serise vërehet se importi shfaq luhatje të rregullta sezonale, që përsëriten pothuajse çdo vit, si dhe ndryshime të dukshme në nivelin e tij përgjatë kohës. Seria nuk rezulton stacionare në formën fillestare, çka tregon praninë e trendit dhe nevojën për transformime ose modele që marrin parasysh këtë sjellje. Modelet e ndërtuara tregojnë se importi ndikohet kryesisht nga vlerat e kaluara afatshkurtra, ndërsa parashikimet sugjerojnë një stabilizim relativ të nivelit të importit në periudhën e ardhshme, por me pasiguri që rritet sa më shumë largohemi nga periudha e vëzhgimit.
